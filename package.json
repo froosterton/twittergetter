@@ -1,0 +1,27 @@
+{
+  "name": "rolimons-social-scraper",
+  "version": "1.0.0",
+  "description": "Enhanced Rolimons Social Scraper for finding social media connections",
+  "main": "twitterscraper.js",
+  "scripts": {
+    "start": "node twitterscraper.js",
+    "dev": "node twitterscraper.js"
+  },
+  "dependencies": {
+    "selenium-webdriver": "^4.15.0",
+    "axios": "^1.6.0",
+    "readline": "^1.3.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "roblox",
+    "rolimons",
+    "scraper",
+    "selenium",
+    "social-media"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+} 
