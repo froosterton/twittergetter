@@ -19,8 +19,9 @@ RUN apt-get update && apt-get install -y \
 # Install ChromeDriver (compatible with latest Chrome)
 RUN CHROME_VERSION=$(google-chrome --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+') && \
     echo "Chrome version: $CHROME_VERSION" && \
-    CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE") && \
-    echo "ChromeDriver version: $CHROMEDRIVER_VERSION" && \
+    # Use a recent ChromeDriver version that should be compatible with Chrome 139
+    CHROMEDRIVER_VERSION="119.0.6045.105" && \
+    echo "Using ChromeDriver version: $CHROMEDRIVER_VERSION" && \
     wget -q "https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip" && \
     unzip chromedriver_linux64.zip && \
     mv chromedriver /usr/local/bin/ && \
