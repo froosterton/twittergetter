@@ -5,9 +5,10 @@ const readline = require('readline');
 const fs = require('fs');
 
 // --- CONFIGURATION ---
-const WEBHOOK_URL = 'https://discord.com/api/webhooks/1404188843451744377/egOgRSomhoOCJvjL4ssBVHUnpCcvWYBZsBJ8pgEJNEsFScezJQy6w0NS3JYlSpSc9Yz3';
-const MAX_VALUE = 7000000;
-const MAX_TRADE_ADS = 1000;
+const WEBHOOK_URL = process.env.WEBHOOK_URL || 'https://discord.com/api/webhooks/1404188843451744377/egOgRSomhoOCJvjL4ssBVHUnpCcvWYBZsBJ8pgEJNEsFScezJQy6w0NS3JYlSpSc9Yz3';
+const MAX_VALUE = parseInt(process.env.MAX_VALUE) || 7000000;
+const MAX_TRADE_ADS = parseInt(process.env.MAX_TRADE_ADS) || 1000;
+const AUTH_TOKEN = process.env.AUTH_TOKEN || '';
 
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
@@ -32,7 +33,21 @@ async function initializeWebDriver() {
     try {
         console.log('🔧 Initializing Selenium WebDriver...');
         const options = new chrome.Options();
-        options.addArguments('--headless', '--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--window-size=1920,1080');
+        options.addArguments(
+            '--headless',
+            '--no-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--window-size=1920,1080',
+            '--disable-blink-features=AutomationControlled',
+            '--disable-web-security',
+            '--allow-running-insecure-content',
+            '--disable-extensions',
+            '--disable-plugins',
+            '--disable-images',
+            '--disable-javascript',
+            '--disable-default-apps'
+        );
         driver = await new Builder().forBrowser('chrome').setChromeOptions(options).build();
         console.log('✅ Selenium WebDriver initialized successfully');
         return true;
@@ -369,17 +384,16 @@ async function checkRobloxProfile(username) {
         )
         .build();
 
-    // Add authentication token to browser
-    const authToken = '_|WARNING:-DO-NOT-SHARE-THIS.--Sharing-this-will-allow-someone-to-log-in-as-you-and-to-steal-your-ROBUX-and-items.|_CAEaAhAB.A9AC47FDA06BFD6AC3B3FE46675ED63DF411BA91C8AB596DA25322000127830B534DC8BD6FDDCEDAA6EC9516865271AF4E83C8150985ADE547F4D08C79D9D6BE51AB12F1EA63CBE0CF1ED2629909D6DA42A3C26D77D93638310867926891262F0A13FB2BEB7E7F6CB6805D1AB69A968B3BC2D73EC7AF00DF19C0D10D7A722E68E0CA4F169FC88E66D7DB183823C6F79F37EB793C8049F725CCFBC85403A2F8EFAA6E3EAE5D015CAB5B6408FF03F3A4609B3F371982A9B22828C058F0D72EF9BFA8C30E9DD11DDDB70932AEC2A60C416E1B10C0431246AAF69C2E28BFD1F7B5B082EBF48B667EA6BC1B8D66A17A5902419F753CFA03FB32250958651EF144A021AB7E989623AD48F2949D60D3E48E46EAE978CB43F78F16699DC54CAF8F9E0D8D30103DEA345A3A1684F57F7E4DC4CEEABC1EB943135B7901789E505932D3CDDD4959DEB34C55124509EEC3BE1BF2D9E45904DF7CC439146E9D030BCF9294471E53ACC1C70C255ECCB70347836180F79D0F3DE775AAA12BDF177AC8493E0C6428AF6DC922814F567EBBA4CEF2AD246BC7D677457C5A46249E1A1D83FB90693183CEDB3B2CC8BEC7822BFBB6AF777BAA803A799A7D3492FCBABA9BE6EFF75296226719E2F8EAA182A1A446420343FD528CB62849686ED6BEEB87FDF60CDA3E7438192E4ABDFD16CC85E6E0B4590386C13F10E760407F6A9585EB7D07BCE8B331663070C37970DE185B5E18E880E4ECD9397A90C2ACC514DB993F9F402DD963DE579CA6144F125344E601C4B2C807B8FECD1570D12424F59866A124BC9985C4723D06E0325CF28D4F4FEA8261CD8B0FBFFBDE8B4D379062A4B1F800975ABBE3D663EC88821E2BDE1311A4646E56C50EDA0128CD3D17FAC75479379FB3EE641D100DD40989B4321C4EA41F488D116762A5013A381656317E0B98A9895DF474DD6763D55B73B272EDF9EAFD496CE28540439D88D0F7411721289F5B71C44DD5B0409127CB42CDAC150C063F7456109965CAF0A77B1BD5CC6614382DDFD58B64A971D42E700B743F4362089F65E48ED0CAC73941D1BD7F58B7A8BC9992DCCA73B919AE045749109CA45C85FE3AB9B63FF5FC7E0D42D6233F9F60E46090068E62DA023033AA0C8627E9611F824E27C52A0C7C49837009D35B0F745528F3F15BBBD821EEB6B7F95D2CA8BB51897937FC596BA556C2CFE025A80D2025F37E830173E235DBE68F8CC9';
-    
-    // Set the authentication token as a cookie
-    await tempDriver.get('https://www.roblox.com');
-    await tempDriver.manage().addCookie({
-        name: '.ROBLOSECURITY',
-        value: authToken,
-        domain: '.roblox.com',
-        path: '/'
-    });
+    // Add authentication token to browser (if provided)
+    if (AUTH_TOKEN) {
+        await tempDriver.get('https://www.roblox.com');
+        await tempDriver.manage().addCookie({
+            name: '.ROBLOSECURITY',
+            value: AUTH_TOKEN,
+            domain: '.roblox.com',
+            path: '/'
+        });
+    }
 
     try {
         // Use user ID for Roblox profile URL (more reliable than username)
