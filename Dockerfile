@@ -20,8 +20,16 @@ RUN wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd6
     rm google-chrome-stable_current_amd64.deb && \
     rm -rf /var/lib/apt/lists/*
 
-# Install ChromeDriver using npm
-RUN npm install -g chromedriver
+# Install ChromeDriver that matches Chrome version
+RUN CHROME_MAJOR_VERSION=$(google-chrome --version | grep -oE '[0-9]+' | head -1) && \
+    echo "Chrome major version: $CHROME_MAJOR_VERSION" && \
+    CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_MAJOR_VERSION") && \
+    echo "ChromeDriver version: $CHROMEDRIVER_VERSION" && \
+    wget -q "https://chromedriver.storage.googleapis.com/$CHROMEDRIVER_VERSION/chromedriver_linux64.zip" && \
+    unzip chromedriver_linux64.zip && \
+    mv chromedriver /usr/local/bin/ && \
+    chmod +x /usr/local/bin/chromedriver && \
+    rm chromedriver_linux64.zip
 
 # Set up app directory
 WORKDIR /app
