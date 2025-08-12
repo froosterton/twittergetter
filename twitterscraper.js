@@ -210,10 +210,13 @@ async function scrapeRolimonsItem(itemId) {
                          }
 
                         // Get Rolimons data
+                        console.log(`(Getting data for "${username}" from ${userUrl})`);
                         const rolimonsData = await scrapeRolimonsUserProfile(userUrl);
                         if (!rolimonsData) {
+                            console.log(`(Failed to get data for "${username}", skipping)`);
                             continue;
                         }
+                        console.log(`(Got data for "${username}" - Value: ${rolimonsData.value.toLocaleString()}, Trade Ads: ${rolimonsData.tradeAds})`);
                         
                         if (rolimonsData.value > MAX_VALUE) {
                             console.log(`(Skipping "${username}" - Value too high: ${rolimonsData.value.toLocaleString()})`);
@@ -353,6 +356,7 @@ async function scrapeRolimonsUserProfile(profileUrl) {
         .build();
 
     try {
+        console.log(`(Scraping profile: ${profileUrl})`);
         await tempDriver.get(profileUrl);
         await tempDriver.sleep(2000);
 
@@ -425,6 +429,7 @@ async function scrapeRolimonsUserProfile(profileUrl) {
         };
 
     } catch (error) {
+        console.log(`(Error scraping profile: ${error.message})`);
         await tempDriver.quit();
         return null;
     }
