@@ -5,12 +5,14 @@
   "main": "twitterscraper.js",
   "scripts": {
     "start": "node twitterscraper.js",
-    "dev": "node twitterscraper.js"
+    "dev": "node twitterscraper.js",
+    "postinstall": "npx chromedriver --version"
   },
   "dependencies": {
     "selenium-webdriver": "^4.15.0",
     "axios": "^1.6.0",
-    "readline": "^1.3.0"
+    "readline": "^1.3.0",
+    "chromedriver": "^139.0.0"
   },
   "engines": {
     "node": ">=18.0.0"
