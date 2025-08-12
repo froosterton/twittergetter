@@ -343,6 +343,13 @@ async function scrapeRolimonsItem(itemId) {
 
 // --- ROLIMONS USER PROFILE SCRAPING ---
 async function scrapeRolimonsUserProfile(profileUrl) {
+    // Add timeout for this function
+    let timeoutReached = false;
+    const timeout = setTimeout(() => {
+        console.log(`(Rolimons profile timeout for ${profileUrl}, returning default values)`);
+        timeoutReached = true;
+    }, 10000); // 10 second timeout
+    
     const tempDriver = await new Builder()
         .forBrowser('chrome')
         .setChromeOptions(
@@ -352,13 +359,29 @@ async function scrapeRolimonsUserProfile(profileUrl) {
                 .addArguments('--window-size=1920,1080')
                 .addArguments('--no-sandbox')
                 .addArguments('--disable-dev-shm-usage')
+                .addArguments('--timeout=10000') // 10 second timeout
+                .addArguments('--page-load-timeout=10000') // 10 second page load timeout
         )
         .build();
 
     try {
+        // Check timeout before starting
+        if (timeoutReached) {
+            clearTimeout(timeout);
+            await tempDriver.quit();
+            return { username: '', userId: '', value: 0, tradeAds: 0 };
+        }
+        
         console.log(`(Scraping profile: ${profileUrl})`);
         await tempDriver.get(profileUrl);
-        await tempDriver.sleep(2000);
+        await tempDriver.sleep(1000); // Reduced from 2000ms to 1000ms
+        
+        // Check timeout after page load
+        if (timeoutReached) {
+            clearTimeout(timeout);
+            await tempDriver.quit();
+            return { username: '', userId: '', value: 0, tradeAds: 0 };
+        }
 
         const getText = async (selector) => {
             try {
@@ -419,6 +442,14 @@ async function scrapeRolimonsUserProfile(profileUrl) {
             }
         }
 
+        // Check timeout before returning
+        if (timeoutReached) {
+            clearTimeout(timeout);
+            await tempDriver.quit();
+            return { username: '', userId: '', value: 0, tradeAds: 0 };
+        }
+        
+        clearTimeout(timeout);
         await tempDriver.quit();
 
         return {
@@ -429,9 +460,14 @@ async function scrapeRolimonsUserProfile(profileUrl) {
         };
 
     } catch (error) {
+        clearTimeout(timeout);
         console.log(`(Error scraping profile: ${error.message})`);
-        await tempDriver.quit();
-        return null;
+        try {
+            await tempDriver.quit();
+        } catch (quitError) {
+            console.log(`(Error quitting driver: ${quitError.message})`);
+        }
+        return { username: '', userId: '', value: 0, tradeAds: 0 };
     }
 }
 
