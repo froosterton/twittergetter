@@ -16,17 +16,20 @@ RUN apt-get update && apt-get install -y \
     && apt-get install -y google-chrome-stable \
     && rm -rf /var/lib/apt/lists/*
 
-# Install ChromeDriver (compatible with latest Chrome)
-RUN CHROME_VERSION=$(google-chrome --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+') && \
+# Install ChromeDriver with fallback approach
+RUN CHROME_VERSION=$(google-chrome --version | grep -oE '[0-9]+\.[0-9]+') && \
     echo "Chrome version: $CHROME_VERSION" && \
-    # Use a recent ChromeDriver version that should be compatible with Chrome 139
-    CHROMEDRIVER_VERSION="119.0.6045.105" && \
-    echo "Using ChromeDriver version: $CHROMEDRIVER_VERSION" && \
-    wget -q "https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip" && \
-    unzip chromedriver_linux64.zip && \
-    mv chromedriver /usr/local/bin/ && \
+    # Try the new Chrome for Testing URL first
+    if wget -q "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/$CHROME_VERSION.0.6045.105/linux64/chromedriver-linux64.zip" -O chromedriver.zip; then \
+        echo "Downloaded ChromeDriver from new URL"; \
+    else \
+        echo "New URL failed, trying alternative version"; \
+        wget -q "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing/119.0.6045.105/linux64/chromedriver-linux64.zip" -O chromedriver.zip; \
+    fi && \
+    unzip chromedriver.zip && \
+    mv chromedriver-linux64/chromedriver /usr/local/bin/ && \
     chmod +x /usr/local/bin/chromedriver && \
-    rm chromedriver_linux64.zip
+    rm -rf chromedriver.zip chromedriver-linux64
 
 # Set up app directory
 WORKDIR /app
