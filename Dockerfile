@@ -1,8 +1,9 @@
-# Use Node.js base image
-FROM node:18
+# Use Node.js base image with Debian Bullseye (more stable)
+FROM node:18-bullseye
 
-# Install Chrome and dependencies
-RUN apt-get update && apt-get install -y \
+# Install system dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
     wget \
     gnupg \
     ca-certificates \
@@ -10,13 +11,16 @@ RUN apt-get update && apt-get install -y \
     libxss1 \
     curl \
     unzip \
-    && wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
-    && sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list' \
-    && apt-get update \
-    && apt-get install -y google-chrome-stable \
     && rm -rf /var/lib/apt/lists/*
 
-# Install ChromeDriver using npm (most reliable method)
+# Download and install Chrome manually (bypasses repository issues)
+RUN wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && \
+    apt-get update && \
+    apt-get install -y ./google-chrome-stable_current_amd64.deb && \
+    rm google-chrome-stable_current_amd64.deb && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install ChromeDriver using npm
 RUN npm install -g chromedriver
 
 # Set up app directory
