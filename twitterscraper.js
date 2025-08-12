@@ -1,7 +1,6 @@
 const { Builder, By, until } = require('selenium-webdriver');
 const chrome = require('selenium-webdriver/chrome');
 const axios = require('axios');
-const readline = require('readline');
 const fs = require('fs');
 
 // --- CONFIGURATION ---
@@ -9,8 +8,7 @@ const WEBHOOK_URL = process.env.WEBHOOK_URL || 'https://discord.com/api/webhooks
 const MAX_VALUE = parseInt(process.env.MAX_VALUE) || 7000000;
 const MAX_TRADE_ADS = parseInt(process.env.MAX_TRADE_ADS) || 1000;
 const AUTH_TOKEN = process.env.AUTH_TOKEN || '';
-
-const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+const ITEM_IDS = process.env.ITEM_IDS || '123456,789012'; // Default item IDs to scrape
 
 let driver;
 let totalUsersProcessed = 0;
@@ -617,31 +615,28 @@ async function main() {
         return;
     }
 
-    rl.question('Enter Rolimons item IDs to scrape (comma-separated): ', async (input) => {
-        if (input && input.trim()) {
-            const itemIds = input.split(',').map(id => id.trim()).filter(id => id);
-            console.log(`\n📋 Queue created with ${itemIds.length} items`);
-            
-            for (let i = 0; i < itemIds.length; i++) {
-                const itemId = itemIds[i];
-                console.log(`\n🔄 Processing item ${i + 1}/${itemIds.length}: ${itemId}`);
-                await scrapeRolimonsItem(itemId);
-                
-                if (i < itemIds.length - 1) {
-                    console.log(`\n⏳ Waiting 10 seconds before next item...`);
-                    await new Promise(resolve => setTimeout(resolve, 10000));
-                }
-            }
-            
-            console.log(`\n🎉 All items completed!`);
-            console.log(`📊 Total users processed: ${totalUsersProcessed}`);
-            console.log(`🔗 Total connections found: ${totalConnectionsFound}`);
+    // Use environment variable for item IDs instead of readline
+    const itemIds = ITEM_IDS.split(',').map(id => id.trim()).filter(id => id);
+    console.log(`\n📋 Queue created with ${itemIds.length} items: ${itemIds.join(', ')}`);
+    
+    for (let i = 0; i < itemIds.length; i++) {
+        const itemId = itemIds[i];
+        console.log(`\n🔄 Processing item ${i + 1}/${itemIds.length}: ${itemId}`);
+        await scrapeRolimonsItem(itemId);
+        
+        if (i < itemIds.length - 1) {
+            console.log(`\n⏳ Waiting 10 seconds before next item...`);
+            await new Promise(resolve => setTimeout(resolve, 10000));
         }
-        rl.close();
-        if (driver) {
-            await driver.quit();
-        }
-    });
+    }
+    
+    console.log(`\n🎉 All items completed!`);
+    console.log(`📊 Total users processed: ${totalUsersProcessed}`);
+    console.log(`🔗 Total connections found: ${totalConnectionsFound}`);
+    
+    if (driver) {
+        await driver.quit();
+    }
 }
 
 main().catch(console.error);
