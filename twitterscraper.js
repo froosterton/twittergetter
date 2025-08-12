@@ -44,8 +44,22 @@ async function initializeWebDriver() {
             '--disable-plugins',
             '--disable-images',
             '--disable-javascript',
-            '--disable-default-apps'
+            '--disable-default-apps',
+            '--remote-debugging-port=9222',
+            '--disable-background-timer-throttling',
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding',
+            '--disable-features=TranslateUI',
+            '--disable-ipc-flooding-protection'
         );
+        
+        // Add experimental options for newer Chrome versions
+        options.addArguments('--disable-blink-features');
+        options.addArguments('--disable-blink-features=AutomationControlled');
+        
+        // Set Chrome binary path explicitly
+        options.setChromeBinaryPath('/usr/bin/google-chrome-stable');
+        
         driver = await new Builder().forBrowser('chrome').setChromeOptions(options).build();
         console.log('✅ Selenium WebDriver initialized successfully');
         return true;
