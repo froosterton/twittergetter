@@ -437,6 +437,10 @@ async function scrapeRolimonsUserProfile(profileUrl) {
 
 // --- CHECK ROBOX PROFILE FOR SOCIAL CONNECTIONS ---
 async function checkRobloxProfile(username) {
+    // Add timeout to prevent hanging
+    const timeout = setTimeout(() => {
+        console.log(`(Timeout reached for ${username}, returning no connection)`);
+    }, 30000); // 30 second timeout
     const tempDriver = await new Builder()
         .forBrowser('chrome')
         .setChromeOptions(
@@ -466,6 +470,7 @@ async function checkRobloxProfile(username) {
     try {
         // Use user ID for Roblox profile URL (more reliable than username)
         const robloxUrl = `https://www.roblox.com/users/${username}/profile`;
+        console.log(`(Checking Roblox profile: ${robloxUrl})`);
         await tempDriver.get(robloxUrl);
         await tempDriver.sleep(5000);
         
@@ -494,8 +499,10 @@ async function checkRobloxProfile(username) {
         let connectionData = '';
 
         try {
+            console.log(`(Looking for social connections...)`);
             // Find Angular social link components directly
             const socialComponents = await tempDriver.findElements(By.css('social-link-icon'));
+            console.log(`(Found ${socialComponents.length} social components)`);
             
             let socialLinks = [];
             
@@ -578,6 +585,8 @@ async function checkRobloxProfile(username) {
             // Error checking social links, continue
         }
 
+        clearTimeout(timeout);
+        console.log(`(Connection check complete - Found: ${connectionFound}, Type: ${connectionType})`);
         await tempDriver.quit();
 
         return {
@@ -587,6 +596,8 @@ async function checkRobloxProfile(username) {
         };
 
     } catch (error) {
+        clearTimeout(timeout);
+        console.log(`(Error checking Roblox profile: ${error.message})`);
         await tempDriver.quit();
         return {
             connectionFound: false,
