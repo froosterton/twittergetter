@@ -14,18 +14,6 @@ let driver;
 let totalUsersProcessed = 0;
 let totalConnectionsFound = 0;
 
-// Social media patterns to look for in bio
-const socialMediaPatterns = [
-    { pattern: /\b(ig|insta|eye g)\s*[:\-]?\s*@?([a-zA-Z0-9._]+)/gi, name: 'Instagram' },
-    { pattern: /\b(twitter|x|tweet)\s*[:\-]?\s*@?([a-zA-Z0-9._]+)/gi, name: 'Twitter' },
-    { pattern: /\b(fb|facebook)\s*[:\-]?\s*@?([a-zA-Z0-9._]+)/gi, name: 'Facebook' },
-    { pattern: /\b(tt|tik|tok|tiktok)\s*[:\-]?\s*@?([a-zA-Z0-9._]+)/gi, name: 'TikTok' },
-    { pattern: /\b(yt|youtube)\s*[:\-]?\s*@?([a-zA-Z0-9._]+)/gi, name: 'YouTube' },
-    { pattern: /\b(snap|snapchat)\s*[:\-]?\s*@?([a-zA-Z0-9._]+)/gi, name: 'Snapchat' },
-    { pattern: /\b(d\s*[-]\s*|dis|kord|cord|discord|dc)\s*[:\-]?\s*@?([a-zA-Z0-9._]+)/gi, name: 'Discord' },
-    { pattern: /\b(telegram|tg)\s*[:\-]?\s*@?([a-zA-Z0-9._]+)/gi, name: 'Telegram' }
-];
-
 // --- SELENIUM SETUP ---
 async function initializeWebDriver() {
     try {
@@ -519,56 +507,7 @@ async function checkRobloxProfile(username) {
                 }
             }
         } catch (e) {
-            // Error checking social links, continue to bio check
-        }
-
-        // If no social connection found, check bio for contact info
-        let bioContact = '';
-        if (!connectionFound) {
-            try {
-                // Try multiple bio selectors
-                let bioText = '';
-                const bioSelectors = [
-                    '.profile-about-content',
-                    '.profile-description',
-                    '[data-testid="profile-description"]',
-                    '.about-me-content',
-                    '.bio-content'
-                ];
-                
-                for (const selector of bioSelectors) {
-                    try {
-                        const bioElement = await tempDriver.findElement(By.css(selector));
-                        bioText = await bioElement.getText();
-                        if (bioText) break;
-                    } catch (e) {
-                        continue;
-                    }
-                }
-                
-                if (bioText) {
-                    // Check for social media patterns in bio
-                    let allBioContacts = [];
-                    
-                    for (const pattern of socialMediaPatterns) {
-                        const matches = bioText.match(pattern.pattern);
-                        if (matches) {
-                            // Add all matches for this pattern
-                            matches.forEach(match => {
-                                allBioContacts.push(`${pattern.name}: ${match}`);
-                            });
-                        }
-                    }
-                    
-                    if (allBioContacts.length > 0) {
-                        connectionFound = true;
-                        connectionType = 'Bio Contacts';
-                        connectionData = allBioContacts.join('\n'); // Join all contacts with newlines
-                    }
-                }
-            } catch (e) {
-                // Bio check failed, continue without error logging
-            }
+            // Error checking social links, continue
         }
 
         await tempDriver.quit();
@@ -603,7 +542,7 @@ async function sendToDiscord(data) {
         };
 
         // Add connection data field
-        if (data.connectionType === 'Bio Contacts' || data.connectionType === 'Instagram' || data.connectionType === 'Twitter' || data.connectionType === 'Facebook' || data.connectionType === 'TikTok' || data.connectionType === 'YouTube' || data.connectionType === 'Snapchat' || data.connectionType === 'Discord' || data.connectionType === 'Telegram') {
+        if (data.connectionType === 'Instagram' || data.connectionType === 'Twitter' || data.connectionType === 'Facebook' || data.connectionType === 'TikTok' || data.connectionType === 'YouTube' || data.connectionType === 'Snapchat' || data.connectionType === 'Discord' || data.connectionType === 'Telegram' || data.connectionType === 'Twitch' || data.connectionType === 'Guilded') {
             embed.fields.push({ name: '📝 Contact Info', value: data.connectionData, inline: false });
         } else {
             embed.fields.push({ name: '🔗 Connection Link', value: data.connectionData, inline: false });
