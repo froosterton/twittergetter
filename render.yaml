@@ -2,7 +2,7 @@ services:
   - type: web
     name: rolimons-social-scraper
     env: node
-    buildCommand: docker build -t rolimons-scraper .
+    buildCommand: npm install
     startCommand: npm start
     envVars:
       - key: WEBHOOK_URL
@@ -13,5 +13,7 @@ services:
         value: 1000
       - key: AUTH_TOKEN
         value: ""
+      - key: ITEM_IDS
+        value: "123456,789012"
       - key: NODE_ENV
         value: production 
