@@ -24,29 +24,9 @@ async function initializeWebDriver() {
             '--no-sandbox',
             '--disable-dev-shm-usage',
             '--disable-gpu',
-            '--window-size=1920,1080',
-            '--disable-blink-features=AutomationControlled',
             '--disable-web-security',
-            '--allow-running-insecure-content',
-            '--disable-extensions',
-            '--disable-plugins',
-            '--disable-images',
-            '--disable-javascript',
-            '--disable-default-apps',
-            '--remote-debugging-port=9222',
-            '--disable-background-timer-throttling',
-            '--disable-backgrounding-occluded-windows',
-            '--disable-renderer-backgrounding',
-            '--disable-features=TranslateUI',
-            '--disable-ipc-flooding-protection'
+            '--disable-features=VizDisplayCompositor'
         );
-        
-        // Add experimental options for newer Chrome versions
-        options.addArguments('--disable-blink-features');
-        options.addArguments('--disable-blink-features=AutomationControlled');
-        
-        // Set Chrome binary path explicitly
-        options.setChromeBinaryPath('/usr/bin/google-chrome-stable');
         
         driver = await new Builder().forBrowser('chrome').setChromeOptions(options).build();
         console.log('✅ Selenium WebDriver initialized successfully');
@@ -97,9 +77,8 @@ async function scrapeRolimonsItem(itemId) {
 
         // Check for rate limit
         if (await isRolimonsRateLimited(driver)) {
-            console.log('🚫 Rate limited! Switching VPN...');
-            await driver.get(url);
-            await driver.sleep(5000);
+            console.log('🚫 Rate limited! Waiting 30 seconds...');
+            await driver.sleep(30000);
         }
 
         // Go to last page
