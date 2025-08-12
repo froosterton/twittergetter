@@ -99,10 +99,50 @@ async function scrapeRolimonsItem(itemId) {
                 
                 if (totalPages > 1) {
                     console.log(`📄 Found ${totalPages} total pages, going to last page...`);
-                    const lastPageButton = await driver.findElement(By.xpath(`//a[@class='page-link' and @data-dt-idx and text()='${totalPages}']`));
-                    await lastPageButton.click();
-                    await driver.sleep(5000);
-                    console.log(`✅ Now on page ${totalPages} (last page)`);
+                    try {
+                        // Scroll to top first
+                        await driver.executeScript('window.scrollTo(0, 0);');
+                        await driver.sleep(1000);
+                        
+                        // Try to find and click the last page button
+                        let lastPageButton = null;
+                        
+                        // Method 1: Try XPath
+                        try {
+                            lastPageButton = await driver.findElement(By.xpath(`//a[@class='page-link' and @data-dt-idx and text()='${totalPages}']`));
+                        } catch (e) {}
+                        
+                        // Method 2: Try CSS selector
+                        if (!lastPageButton) {
+                            try {
+                                const buttons = await driver.findElements(By.css('a.page-link'));
+                                for (const button of buttons) {
+                                    const text = await button.getText();
+                                    if (text === totalPages.toString()) {
+                                        lastPageButton = button;
+                                        break;
+                                    }
+                                }
+                            } catch (e) {}
+                        }
+                        
+                        if (lastPageButton) {
+                            // Try JavaScript click if regular click fails
+                            try {
+                                await lastPageButton.click();
+                            } catch (clickError) {
+                                console.log('Regular click failed, trying JavaScript click...');
+                                await driver.executeScript('arguments[0].click();', lastPageButton);
+                            }
+                            await driver.sleep(5000);
+                            console.log(`✅ Now on page ${totalPages} (last page)`);
+                        } else {
+                            console.log('⚠️ Could not find last page button, starting from current page');
+                        }
+                    } catch (error) {
+                        console.log('⚠️ Error navigating to last page:', error.message);
+                        console.log('Starting from current page...');
+                    }
                 }
             }
         } catch (e) {
@@ -223,15 +263,59 @@ async function scrapeRolimonsItem(itemId) {
                 try {
                     console.log('⬅️ Attempting to go to previous page...');
                     
-                    const prevButtons = await driver.findElements(By.css('li.paginate_button.page-item.previous:not(.disabled) a.page-link'));
+                    // Scroll to top to avoid element interception
+                    await driver.executeScript('window.scrollTo(0, 0);');
+                    await driver.sleep(1000);
                     
-                    if (prevButtons.length > 0) {
-                        await prevButtons[0].click();
+                    // Try multiple approaches to find and click the previous button
+                    let prevButton = null;
+                    
+                    // Method 1: Try the standard previous button
+                    try {
+                        const prevButtons = await driver.findElements(By.css('li.paginate_button.page-item.previous:not(.disabled) a.page-link'));
+                        if (prevButtons.length > 0) {
+                            prevButton = prevButtons[0];
+                        }
+                    } catch (e) {}
+                    
+                    // Method 2: Try finding by text content
+                    if (!prevButton) {
+                        try {
+                            const allButtons = await driver.findElements(By.css('a.page-link'));
+                            for (const button of allButtons) {
+                                const text = await button.getText();
+                                if (text === 'Previous' || text === '‹') {
+                                    prevButton = button;
+                                    break;
+                                }
+                            }
+                        } catch (e) {}
+                    }
+                    
+                    // Method 3: Try finding by aria-label
+                    if (!prevButton) {
+                        try {
+                            const prevButtons = await driver.findElements(By.css('a.page-link[aria-label="Previous"]'));
+                            if (prevButtons.length > 0) {
+                                prevButton = prevButtons[0];
+                            }
+                        } catch (e) {}
+                    }
+                    
+                    if (prevButton) {
+                        // Try to click using JavaScript if regular click fails
+                        try {
+                            await prevButton.click();
+                        } catch (clickError) {
+                            console.log('Regular click failed, trying JavaScript click...');
+                            await driver.executeScript('arguments[0].click();', prevButton);
+                        }
+                        
                         await driver.sleep(3000);
                         currentPage--;
                         console.log(`✅ Moved to page ${currentPage}`);
                     } else {
-                        console.log('🔚 Reached first page, scraping complete!');
+                        console.log('🔚 No previous button found, reached first page');
                         break;
                     }
                 } catch (error) {
