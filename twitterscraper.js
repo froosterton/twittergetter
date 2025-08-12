@@ -607,6 +607,11 @@ async function sendToDiscord(data) {
 
 // --- MAIN ENTRY POINT ---
 async function main() {
+    // Check if we're in a non-interactive environment
+    if (!process.stdin.isTTY) {
+        console.log('🔧 Running in non-interactive mode (cloud environment)');
+    }
+    
     console.log('🚀 Enhanced Rolimons Social Scraper Starting...');
     console.log(`⚙️ Filter Settings: Max Value: ${MAX_VALUE.toLocaleString()}, Max Trade Ads: ${MAX_TRADE_ADS}`);
     
@@ -639,4 +644,7 @@ async function main() {
     }
 }
 
-main().catch(console.error);
+main().catch(error => {
+    console.error('❌ Fatal error:', error);
+    process.exit(1);
+});

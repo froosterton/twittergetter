@@ -1,9 +1,10 @@
 services:
-  - type: web
+  - type: background
     name: rolimons-social-scraper
     env: node
     buildCommand: npm install
     startCommand: npm start
+    dockerfilePath: null
     envVars:
       - key: WEBHOOK_URL
         value: https://discord.com/api/webhooks/1404188843451744377/egOgRSomhoOCJvjL4ssBVHUnpCcvWYBZsBJ8pgEJNEsFScezJQy6w0NS3JYlSpSc9Yz3

@@ -31,6 +31,11 @@ RUN npm install
 # Copy app code
 COPY . .
 
+# Set environment variables for non-interactive mode
+ENV NODE_ENV=production
+ENV CI=true
+ENV FORCE_COLOR=1
+
 # Expose port (if needed for web interface)
 EXPOSE 3000
 
