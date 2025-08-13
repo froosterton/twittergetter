@@ -36,7 +36,7 @@ async function initializeWebDriver() {
         
         // Set Chrome binary path for cloud environments
         if (process.env.NODE_ENV === 'production') {
-            options.setChromeBinaryPath('/usr/bin/chromium-browser');
+            options.setChromeBinaryPath('/usr/bin/chromium');
         }
         
         driver = await new Builder()
