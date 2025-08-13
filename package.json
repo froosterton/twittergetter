@@ -1,0 +1,26 @@
+{
+  "name": "twittergetter",
+  "version": "1.0.0",
+  "description": "Enhanced Rolimons Social Scraper for finding social media connections",
+  "main": "twitterscraperoffline.js",
+  "scripts": {
+    "start": "node twitterscraperoffline.js",
+    "dev": "node twitterscraperoffline.js"
+  },
+  "dependencies": {
+    "selenium-webdriver": "^4.15.0",
+    "axios": "^1.6.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "roblox",
+    "rolimons",
+    "scraper",
+    "selenium",
+    "social-media"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+} 
