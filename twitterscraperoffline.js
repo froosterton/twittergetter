@@ -11,6 +11,7 @@ const AUTH_TOKEN = process.env.AUTH_TOKEN || '';
 const ITEM_IDS = process.env.ITEM_IDS || '123456,789012'; // Default item IDs to scrape
 
 let driver;
+let profileDriver; // Separate driver for profile checks
 let totalUsersProcessed = 0;
 let totalConnectionsFound = 0;
 
@@ -206,7 +207,14 @@ async function scrapeRolimonsItem(itemId) {
                         console.log(`(Checking "${username}")`);
                         
                         // Check Roblox profile for social connections
+                        const startTime = Date.now();
                         const socialData = await checkRobloxProfile(rolimonsData.userId || username);
+                        const endTime = Date.now();
+                        const duration = (endTime - startTime) / 1000;
+                        
+                        if (duration > 5) {
+                            console.log(`⚠️ Profile check took ${duration.toFixed(1)}s (longer than usual)`);
+                        }
                         
                         if (socialData.connectionFound) {
                             console.log(`(Has connection! "${socialData.connectionType}")`);
@@ -227,7 +235,13 @@ async function scrapeRolimonsItem(itemId) {
                         await new Promise(resolve => setTimeout(resolve, 8000));
                         
                     } catch (error) {
-                        console.log(`(Error processing user, continuing...)`);
+                        console.log(`(Error processing user: ${error.message}, continuing...)`);
+                        
+                        // If we get too many errors in a row, skip this page
+                        if (error.message.includes('timeout') || error.message.includes('stale')) {
+                            console.log('⚠️ Too many errors, moving to next page...');
+                            break; // Break out of the user loop, move to next page
+                        }
                         continue;
                     }
                 }
@@ -363,59 +377,64 @@ async function scrapeRolimonsUserProfile(profileUrl) {
 
 // --- CHECK ROBOX PROFILE FOR SOCIAL CONNECTIONS ---
 async function checkRobloxProfile(username) {
-    const tempDriver = await new Builder()
-        .forBrowser('chrome')
-        .setChromeOptions(
-            new chrome.Options()
-                .addArguments('--headless')
-                .addArguments('--disable-gpu')
-                .addArguments('--window-size=1920,1080')
-                .addArguments('--no-sandbox')
-                .addArguments('--disable-dev-shm-usage')
-                .addArguments('--disable-blink-features=AutomationControlled')
-                .addArguments('--disable-web-security')
-                .addArguments('--allow-running-insecure-content')
-        )
-        .build();
-
-    // Add authentication token to browser (if provided)
-    const AUTH_TOKEN = process.env.AUTH_TOKEN || '';
-    
-    if (AUTH_TOKEN) {
-        // Set the authentication token as a cookie
-        await tempDriver.get('https://www.roblox.com');
-        await tempDriver.manage().addCookie({
-            name: '.ROBLOSECURITY',
-            value: AUTH_TOKEN,
-            domain: '.roblox.com',
-            path: '/'
-        });
+    // Use the dedicated profile driver
+    if (!profileDriver) {
+        console.log('🔧 Initializing profile WebDriver...');
+        profileDriver = await new Builder()
+            .forBrowser('chrome')
+            .setChromeOptions(
+                new chrome.Options()
+                    .addArguments('--headless')
+                    .addArguments('--disable-gpu')
+                    .addArguments('--window-size=1920,1080')
+                    .addArguments('--no-sandbox')
+                    .addArguments('--disable-dev-shm-usage')
+                    .addArguments('--disable-blink-features=AutomationControlled')
+                    .addArguments('--disable-web-security')
+                    .addArguments('--allow-running-insecure-content')
+            )
+            .build();
+        
+        // Add authentication token to browser (if provided) - only do this once
+        const AUTH_TOKEN = process.env.AUTH_TOKEN || '';
+        if (AUTH_TOKEN) {
+            await profileDriver.get('https://www.roblox.com');
+            await profileDriver.manage().addCookie({
+                name: '.ROBLOSECURITY',
+                value: AUTH_TOKEN,
+                domain: '.roblox.com',
+                path: '/'
+            });
+        }
     }
 
     try {
+        // Set a timeout for the entire operation
+        const timeout = setTimeout(() => {
+            console.log(`⏰ Timeout reached for ${username}, skipping...`);
+        }, 15000); // 15 second timeout
+
         // Use user ID for Roblox profile URL (more reliable than username)
         const robloxUrl = `https://www.roblox.com/users/${username}/profile`;
-        await tempDriver.get(robloxUrl);
-        await tempDriver.sleep(5000);
+        await profileDriver.get(robloxUrl);
+        await profileDriver.sleep(2000); // Reduced further
         
-        // Wait for page to fully load
-        await tempDriver.sleep(2000);
+        // Wait for page to fully load (reduced time)
+        await profileDriver.sleep(500); // Reduced further
         
-        // Wait for Angular components to load
-        await tempDriver.sleep(3000);
+        // Wait for Angular components to load (reduced time)
+        await profileDriver.sleep(1000); // Reduced further
         
-        // Try to wait for social links to appear
+        // Try to wait for social links to appear (reduced timeout)
         try {
-            await tempDriver.wait(until.elementLocated(By.css('social-link-icon')), 10000);
+            await profileDriver.wait(until.elementLocated(By.css('social-link-icon')), 2000); // Reduced further
         } catch (e) {
             // Continue if not found
         }
         
-        // Scroll down to load more content
-        await tempDriver.executeScript('window.scrollTo(0, document.body.scrollHeight);');
-        await tempDriver.sleep(2000);
-        await tempDriver.executeScript('window.scrollTo(0, 0);');
-        await tempDriver.sleep(1000);
+        // Quick scroll to trigger lazy loading (if any)
+        await profileDriver.executeScript('window.scrollTo(0, 500);');
+        await profileDriver.sleep(250); // Reduced further
 
         // Check for social media connections
         let connectionFound = false;
@@ -424,7 +443,7 @@ async function checkRobloxProfile(username) {
 
         try {
             // Find Angular social link components directly
-            const socialComponents = await tempDriver.findElements(By.css('social-link-icon'));
+            const socialComponents = await profileDriver.findElements(By.css('social-link-icon'));
             
             let socialLinks = [];
             
@@ -510,7 +529,8 @@ async function checkRobloxProfile(username) {
         // If no social connection found, check bio for contact info
 
 
-        await tempDriver.quit();
+        // Clear the timeout since we completed successfully
+        clearTimeout(timeout);
 
         return {
             connectionFound: connectionFound,
@@ -519,7 +539,9 @@ async function checkRobloxProfile(username) {
         };
 
     } catch (error) {
-        await tempDriver.quit();
+        // Clear the timeout in case of error
+        clearTimeout(timeout);
+        
         return {
             connectionFound: false,
             connectionType: '',
@@ -588,6 +610,10 @@ async function main() {
 
     if (driver) {
         await driver.quit();
+    }
+    
+    if (profileDriver) {
+        await profileDriver.quit();
     }
 }
 
