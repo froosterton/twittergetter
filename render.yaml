@@ -11,9 +11,10 @@ services:
         value: 7000000
       - key: MAX_TRADE_ADS
         value: 1000
-      - key: AUTH_TOKEN
-        value: ""
       - key: ITEM_IDS
         value: "123456,789012"
       - key: NODE_ENV
-        value: production 
+        value: production
+      # Optionally set PROXY_URL in the Render dashboard or here if you use a proxy
+      # - key: PROXY_URL
+      #   value: "http://user:pass@host:port" 

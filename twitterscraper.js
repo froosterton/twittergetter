@@ -9,6 +9,7 @@ const MAX_VALUE = parseInt(process.env.MAX_VALUE) || 7000000;
 const MAX_TRADE_ADS = parseInt(process.env.MAX_TRADE_ADS) || 1000;
 const AUTH_TOKEN = process.env.AUTH_TOKEN || '';
 const ITEM_IDS = process.env.ITEM_IDS || '123456,789012'; // Default item IDs to scrape
+const PROXY_URL = process.env.PROXY_URL || '';
 
 let driver;
 let totalUsersProcessed = 0;
@@ -233,8 +234,14 @@ async function scrapeRolimonsItem(itemId) {
                         
                         console.log(`(Checking "${username}")`);
                         
+                        // Only check Roblox if we have a numeric userId
+                        if (!rolimonsData.userId || !/^\d+$/.test(String(rolimonsData.userId))) {
+                            console.log(`(Skipping Roblox check for "${username}" - missing numeric userId)`);
+                            continue;
+                        }
+
                         // Check Roblox profile for social connections
-                        const socialData = await checkRobloxProfile(rolimonsData.userId || username);
+                        const socialData = await checkRobloxProfile(rolimonsData.userId);
                         
                         if (socialData.connectionFound) {
                             console.log(`(Has connection! "${socialData.connectionType}")`);
@@ -471,212 +478,171 @@ async function scrapeRolimonsUserProfile(profileUrl) {
     }
 }
 
-// --- CHECK ROBOX PROFILE FOR SOCIAL CONNECTIONS ---
-async function checkRobloxProfile(username) {
-    // Add timeout to prevent hanging
-    let timeoutReached = false;
-    const timeout = setTimeout(() => {
-        console.log(`(Timeout reached for ${username}, returning no connection)`);
-        timeoutReached = true;
-    }, 15000); // 15 second timeout
-    const tempDriver = await new Builder()
-        .forBrowser('chrome')
-        .setChromeOptions(
-            new chrome.Options()
-                .addArguments('--headless')
-                .addArguments('--disable-gpu')
-                .addArguments('--window-size=1920,1080')
-                .addArguments('--no-sandbox')
-                .addArguments('--disable-dev-shm-usage')
-                .addArguments('--disable-blink-features=AutomationControlled')
-                .addArguments('--disable-web-security')
-                .addArguments('--allow-running-insecure-content')
-                .addArguments('--timeout=15000') // 15 second timeout
-                .addArguments('--page-load-timeout=15000') // 15 second page load timeout
-        )
-        .build();
+// Reusable Roblox WebDriver utilities
+let robloxDriver = null;
 
-    // Add authentication token to browser (if provided)
-    if (AUTH_TOKEN) {
-        await tempDriver.get('https://www.roblox.com');
-        await tempDriver.manage().addCookie({
-            name: '.ROBLOSECURITY',
-            value: AUTH_TOKEN,
-            domain: '.roblox.com',
-            path: '/'
-        });
+function getRobloxChromeOptions() {
+    const options = new chrome.Options();
+    options.addArguments(
+        '--headless=new',
+        '--no-sandbox',
+        '--disable-dev-shm-usage',
+        '--window-size=1920,1080',
+        '--lang=en-US,en;q=0.9',
+        '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+    );
+    if (PROXY_URL) {
+        options.addArguments(`--proxy-server=${PROXY_URL}`);
     }
+    return options;
+}
+
+async function getRobloxDriver() {
+    if (robloxDriver) return robloxDriver;
+    try {
+        robloxDriver = await new Builder()
+            .forBrowser('chrome')
+            .setChromeOptions(getRobloxChromeOptions())
+            .build();
+
+        try {
+            await robloxDriver.get('https://www.roblox.com/');
+            if (AUTH_TOKEN) {
+                await robloxDriver.manage().addCookie({
+                    name: '.ROBLOSECURITY',
+                    value: AUTH_TOKEN,
+                    domain: '.roblox.com',
+                    path: '/'
+                });
+                await robloxDriver.navigate().refresh();
+            }
+            // Minor stealth tweak
+            try {
+                await robloxDriver.executeScript("Object.defineProperty(navigator, 'webdriver', {get: () => undefined});");
+            } catch {}
+        } catch {}
+
+        return robloxDriver;
+    } catch (err) {
+        console.log(`(Failed to start Roblox WebDriver: ${err.message})`);
+        if (robloxDriver) {
+            try { await robloxDriver.quit(); } catch {}
+            robloxDriver = null;
+        }
+        throw err;
+    }
+}
+
+async function quitRobloxDriver() {
+    if (robloxDriver) {
+        try { await robloxDriver.quit(); } catch {}
+        robloxDriver = null;
+    }
+}
+
+process.on('SIGINT', () => { quitRobloxDriver(); });
+process.on('SIGTERM', () => { quitRobloxDriver(); });
+process.on('exit', () => { if (robloxDriver) { try { robloxDriver.quit(); } catch {} robloxDriver = null; } });
+
+// --- CHECK ROBOX PROFILE FOR SOCIAL CONNECTIONS ---
+async function checkRobloxProfile(userId) {
+    if (!/^\d+$/.test(String(userId))) {
+        return { connectionFound: false, connectionType: '', connectionData: '' };
+    }
+
+    let timeoutHandle;
+    const timeoutMs = 15000;
+    const driver = await getRobloxDriver();
 
     try {
-        // Check timeout before starting
-        if (timeoutReached) {
-            clearTimeout(timeout);
-            await tempDriver.quit();
-            return { connectionFound: false, connectionType: '', connectionData: '' };
-        }
-        
-        // Use user ID for Roblox profile URL (more reliable than username)
-        const robloxUrl = `https://www.roblox.com/users/${username}/profile`;
+        let timeoutReached = false;
+        timeoutHandle = setTimeout(() => {
+            timeoutReached = true;
+        }, timeoutMs);
+
+        const robloxUrl = `https://www.roblox.com/users/${userId}/profile`;
         console.log(`(Checking Roblox profile: ${robloxUrl})`);
-        await tempDriver.get(robloxUrl);
-        await tempDriver.sleep(5000);
-        
-        // Check timeout
-        if (timeoutReached) {
-            clearTimeout(timeout);
-            await tempDriver.quit();
-            return { connectionFound: false, connectionType: '', connectionData: '' };
-        }
-        
-        // Wait for page to fully load
-        await tempDriver.sleep(2000);
-        
-        // Check timeout
-        if (timeoutReached) {
-            clearTimeout(timeout);
-            await tempDriver.quit();
-            return { connectionFound: false, connectionType: '', connectionData: '' };
-        }
-        
-        // Wait for Angular components to load
-        await tempDriver.sleep(3000);
-        
-        // Try to wait for social links to appear
-        try {
-            await tempDriver.wait(until.elementLocated(By.css('social-link-icon')), 10000);
-        } catch (e) {
-            // Continue if not found
-        }
-        
-        // Scroll down to load more content
-        await tempDriver.executeScript('window.scrollTo(0, document.body.scrollHeight);');
-        await tempDriver.sleep(2000);
-        await tempDriver.executeScript('window.scrollTo(0, 0);');
-        await tempDriver.sleep(1000);
+        await driver.get(robloxUrl);
 
-        // Check for social media connections
-        let connectionFound = false;
-        let connectionType = '';
-        let connectionData = '';
-
-        // Check timeout before social link detection
-        if (timeoutReached) {
-            clearTimeout(timeout);
-            await tempDriver.quit();
-            return { connectionFound: false, connectionType: '', connectionData: '' };
-        }
-        
+        // Quick interstitial/challenge detection
         try {
-            console.log(`(Looking for social connections...)`);
-            // Find Angular social link components directly
-            const socialComponents = await tempDriver.findElements(By.css('social-link-icon'));
-            console.log(`(Found ${socialComponents.length} social components)`);
-            
-            let socialLinks = [];
-            
-            // Extract links from Angular components
-            if (socialComponents.length > 0) {
-                for (const component of socialComponents) {
-                    try {
-                        const links = await component.findElements(By.css('a'));
-                        for (const link of links) {
-                            const href = await link.getAttribute('href');
-                            const ngHref = await link.getAttribute('ng-href');
-                            const title = await link.getAttribute('title');
-                            const ariaLabel = await link.getAttribute('aria-label');
-                            const actualHref = href || ngHref;
-                            
-                            // Only process and log if it's a social media link
-                            if (actualHref && !actualHref.includes('roblox.com') && !actualHref.includes('create.roblox.com')) {
-                                // Check if it's actually a social media link
-                                if (actualHref.includes('x.com') || actualHref.includes('twitter.com') || 
-                                    actualHref.includes('facebook.com') || actualHref.includes('instagram.com') ||
-                                    actualHref.includes('youtube.com') || actualHref.includes('twitch.tv') ||
-                                    actualHref.includes('guilded.gg') || title === 'Twitter' || title === 'X' ||
-                                    title === 'Facebook' || title === 'Instagram' || title === 'YouTube' ||
-                                    title === 'Twitch' || title === 'Guilded' ||
-                                    ariaLabel?.includes('Twitter') || ariaLabel?.includes('X') ||
-                                    ariaLabel?.includes('Facebook') || ariaLabel?.includes('Instagram') ||
-                                    ariaLabel?.includes('YouTube') || ariaLabel?.includes('Twitch') ||
-                                    ariaLabel?.includes('Guilded')) {
-                                    
-                                    socialLinks.push({link, href: actualHref, title, ariaLabel});
-                                }
-                            }
-                        }
-                    } catch (e) {
-                        continue;
-                    }
-                }
+            const pageSource = await driver.getPageSource();
+            if (/captcha|verify|access denied|request blocked|unusual traffic/i.test(pageSource)) {
+                console.log('(Detected Roblox challenge/interstitial; skipping)');
+                clearTimeout(timeoutHandle);
+                return { connectionFound: false, connectionType: '', connectionData: '' };
             }
-            
-            // Process social links
-            for (const {link, href, title, ariaLabel} of socialLinks) {
+        } catch {}
+
+        // Wait for anchors and nudge the page
+        try { await driver.wait(until.elementLocated(By.css('a[href]')), 5000); } catch {}
+        await driver.executeScript('window.scrollTo(0, document.body.scrollHeight);');
+        await driver.sleep(1000);
+        await driver.executeScript('window.scrollTo(0, 0);');
+
+        // Collect social links
+        const socialLinks = [];
+
+        // Prefer Angular social-link-icon if present
+        try {
+            const socialComponents = await driver.findElements(By.css('social-link-icon'));
+            for (const component of socialComponents) {
                 try {
-                    // Determine connection type from URL or attributes
-                    if (href.includes('x.com') || href.includes('twitter.com') || title === 'Twitter' || title === 'X' || ariaLabel?.includes('Twitter') || ariaLabel?.includes('X')) {
-                        connectionFound = true;
-                        connectionType = 'Twitter';
-                        connectionData = href;
-                        break;
-                    } else if (href.includes('facebook.com') || title === 'Facebook' || ariaLabel?.includes('Facebook')) {
-                        connectionFound = true;
-                        connectionType = 'Facebook';
-                        connectionData = href;
-                        break;
-                    } else if (href.includes('instagram.com') || title === 'Instagram' || ariaLabel?.includes('Instagram')) {
-                        connectionFound = true;
-                        connectionType = 'Instagram';
-                        connectionData = href;
-                        break;
-                    } else if (href.includes('youtube.com') || title === 'YouTube' || ariaLabel?.includes('YouTube')) {
-                        connectionFound = true;
-                        connectionType = 'YouTube';
-                        connectionData = href;
-                        break;
-                    } else if (href.includes('twitch.tv') || title === 'Twitch' || ariaLabel?.includes('Twitch')) {
-                        connectionFound = true;
-                        connectionType = 'Twitch';
-                        connectionData = href;
-                        break;
-                    } else if (href.includes('guilded.gg') || title === 'Guilded' || ariaLabel?.includes('Guilded')) {
-                        connectionFound = true;
-                        connectionType = 'Guilded';
-                        connectionData = href;
-                        break;
+                    const links = await component.findElements(By.css('a[href]'));
+                    for (const link of links) {
+                        const href = await link.getAttribute('href');
+                        if (href && !href.includes('roblox.com') && isSocialHref(href)) {
+                            socialLinks.push(href);
+                        }
                     }
-                } catch (e) {
-                    continue;
-                }
+                } catch {}
             }
-        } catch (e) {
-            // Error checking social links, continue
+        } catch {}
+
+        // Fallback: scan all anchors
+        if (socialLinks.length === 0) {
+            const anchors = await driver.findElements(By.css('a[href]'));
+            for (const a of anchors) {
+                try {
+                    const href = await a.getAttribute('href');
+                    if (href && isSocialHref(href)) {
+                        socialLinks.push(href);
+                    }
+                } catch {}
+            }
         }
 
-        clearTimeout(timeout);
-        console.log(`(Connection check complete - Found: ${connectionFound}, Type: ${connectionType})`);
-        await tempDriver.quit();
+        // Return the first recognized link
+        for (const href of socialLinks) {
+            const type = getSocialType(href);
+            if (type) {
+                clearTimeout(timeoutHandle);
+                return { connectionFound: true, connectionType: type, connectionData: href };
+            }
+        }
 
-        return {
-            connectionFound: connectionFound,
-            connectionType: connectionType,
-            connectionData: connectionData
-        };
-
+        clearTimeout(timeoutHandle);
+        return { connectionFound: false, connectionType: '', connectionData: '' };
     } catch (error) {
-        clearTimeout(timeout);
+        clearTimeout(timeoutHandle);
         console.log(`(Error checking Roblox profile: ${error.message})`);
-        try {
-            await tempDriver.quit();
-        } catch (quitError) {
-            console.log(`(Error quitting driver: ${quitError.message})`);
-        }
-        return {
-            connectionFound: false,
-            connectionType: '',
-            connectionData: ''
-        };
+        try { await quitRobloxDriver(); } catch {}
+        return { connectionFound: false, connectionType: '', connectionData: '' };
     }
+}
+
+function isSocialHref(href) {
+    return /(?:x\.com|twitter\.com|facebook\.com|instagram\.com|youtube\.com|twitch\.tv|guilded\.gg)/i.test(href);
+}
+
+function getSocialType(href) {
+    if (/twitter\.com|x\.com/i.test(href)) return 'Twitter';
+    if (/facebook\.com/i.test(href)) return 'Facebook';
+    if (/instagram\.com/i.test(href)) return 'Instagram';
+    if (/youtube\.com/i.test(href)) return 'YouTube';
+    if (/twitch\.tv/i.test(href)) return 'Twitch';
+    if (/guilded\.gg/i.test(href)) return 'Guilded';
+    return '';
 }
 
 // --- SEND TO DISCORD WEBHOOK ---
