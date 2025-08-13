@@ -150,6 +150,7 @@ async function scrapeRolimonsItem(itemId) {
                 console.log('⚠️ No rows found on this page, moving to previous page...');
             } else {
                 // Process each row
+                let consecutiveErrors = 0;
                 for (let i = 0; i < rows.length; i++) {
                     try {
                         // Re-find the row to avoid stale element issues
@@ -234,12 +235,16 @@ async function scrapeRolimonsItem(itemId) {
                         // Wait between users
                         await new Promise(resolve => setTimeout(resolve, 8000));
                         
-                    } catch (error) {
-                        console.log(`(Error processing user: ${error.message}, continuing...)`);
+                        // Reset error counter on success
+                        consecutiveErrors = 0;
                         
-                        // If we get too many errors in a row, skip this page
-                        if (error.message.includes('timeout') || error.message.includes('stale')) {
-                            console.log('⚠️ Too many errors, moving to next page...');
+                    } catch (error) {
+                        consecutiveErrors++;
+                        console.log(`(Error processing user: ${error.message}, continuing...) (${consecutiveErrors} consecutive errors)`);
+                        
+                        // If we get 3 consecutive errors, skip this page
+                        if (consecutiveErrors >= 3) {
+                            console.log('⚠️ Too many consecutive errors, moving to next page...');
                             break; // Break out of the user loop, move to next page
                         }
                         continue;
@@ -408,22 +413,23 @@ async function checkRobloxProfile(username) {
         }
     }
 
+    let timeout;
     try {
         // Set a timeout for the entire operation
-        const timeout = setTimeout(() => {
+        timeout = setTimeout(() => {
             console.log(`⏰ Timeout reached for ${username}, skipping...`);
-        }, 15000); // 15 second timeout
+        }, 10000); // Reduced to 10 seconds
 
         // Use user ID for Roblox profile URL (more reliable than username)
         const robloxUrl = `https://www.roblox.com/users/${username}/profile`;
         await profileDriver.get(robloxUrl);
-        await profileDriver.sleep(2000); // Reduced further
+        await profileDriver.sleep(1500); // Reduced further
         
         // Wait for page to fully load (reduced time)
         await profileDriver.sleep(500); // Reduced further
         
         // Wait for Angular components to load (reduced time)
-        await profileDriver.sleep(1000); // Reduced further
+        await profileDriver.sleep(750); // Reduced further
         
         // Try to wait for social links to appear (reduced timeout)
         try {
