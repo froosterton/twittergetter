@@ -5,11 +5,13 @@
   "main": "twitterscraper.js",
   "scripts": {
     "start": "node twitterscraper.js",
-    "dev": "node twitterscraper.js"
+    "dev": "node twitterscraper.js",
+    "postinstall": "echo 'Post-install complete'"
   },
   "dependencies": {
     "selenium-webdriver": "^4.15.0",
-    "axios": "^1.6.0"
+    "axios": "^1.6.0",
+    "chromedriver": "^119.0.0"
   },
   "engines": {
     "node": ">=18.0.0"
@@ -22,5 +24,9 @@
     "social-media"
   ],
   "author": "Your Name",
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "your-github-repo-url"
+  }
 } 
