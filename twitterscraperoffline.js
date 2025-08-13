@@ -213,7 +213,7 @@ async function scrapeRolimonsItem(itemId) {
                         const endTime = Date.now();
                         const duration = (endTime - startTime) / 1000;
                         
-                        if (duration > 5) {
+                        if (duration > 4) {
                             console.log(`⚠️ Profile check took ${duration.toFixed(1)}s (longer than usual)`);
                         }
                         
@@ -257,10 +257,24 @@ async function scrapeRolimonsItem(itemId) {
                 try {
                     console.log('⬅️ Attempting to go to previous page...');
                     
+                    // Wait a moment for any overlays to clear
+                    await driver.sleep(1000);
+                    
+                    // Try to scroll to the pagination area first
+                    await driver.executeScript('document.querySelector(".dataTables_paginate").scrollIntoView();');
+                    await driver.sleep(500);
+                    
                     const prevButtons = await driver.findElements(By.css('li.paginate_button.page-item.previous:not(.disabled) a.page-link'));
                     
                     if (prevButtons.length > 0) {
-                        await prevButtons[0].click();
+                        try {
+                            // Use JavaScript click instead of regular click to avoid interception
+                            await driver.executeScript('arguments[0].click();', prevButtons[0]);
+                        } catch (jsError) {
+                            // Fallback to regular click if JavaScript click fails
+                            console.log('⚠️ JavaScript click failed, trying regular click...');
+                            await prevButtons[0].click();
+                        }
                         await driver.sleep(3000);
                         currentPage--;
                         console.log(`✅ Moved to page ${currentPage}`);
@@ -418,29 +432,29 @@ async function checkRobloxProfile(username) {
         // Set a timeout for the entire operation
         timeout = setTimeout(() => {
             console.log(`⏰ Timeout reached for ${username}, skipping...`);
-        }, 10000); // Reduced to 10 seconds
+        }, 8000); // Reduced to 8 seconds
 
         // Use user ID for Roblox profile URL (more reliable than username)
         const robloxUrl = `https://www.roblox.com/users/${username}/profile`;
         await profileDriver.get(robloxUrl);
-        await profileDriver.sleep(1500); // Reduced further
+        await profileDriver.sleep(1000); // Reduced further
         
         // Wait for page to fully load (reduced time)
-        await profileDriver.sleep(500); // Reduced further
+        await profileDriver.sleep(300); // Reduced further
         
         // Wait for Angular components to load (reduced time)
-        await profileDriver.sleep(750); // Reduced further
+        await profileDriver.sleep(500); // Reduced further
         
         // Try to wait for social links to appear (reduced timeout)
         try {
-            await profileDriver.wait(until.elementLocated(By.css('social-link-icon')), 2000); // Reduced further
+            await profileDriver.wait(until.elementLocated(By.css('social-link-icon')), 1500); // Reduced further
         } catch (e) {
             // Continue if not found
         }
         
         // Quick scroll to trigger lazy loading (if any)
-        await profileDriver.executeScript('window.scrollTo(0, 500);');
-        await profileDriver.sleep(250); // Reduced further
+        await profileDriver.executeScript('window.scrollTo(0, 300);');
+        await profileDriver.sleep(150); // Reduced further
 
         // Check for social media connections
         let connectionFound = false;
@@ -448,44 +462,26 @@ async function checkRobloxProfile(username) {
         let connectionData = '';
 
         try {
-            // Find Angular social link components directly
-            const socialComponents = await profileDriver.findElements(By.css('social-link-icon'));
+            // Find Angular social link components directly - use a more specific selector
+            const socialComponents = await profileDriver.findElements(By.css('social-link-icon a[href*="x.com"], social-link-icon a[href*="twitter.com"], social-link-icon a[href*="facebook.com"], social-link-icon a[href*="instagram.com"], social-link-icon a[href*="youtube.com"], social-link-icon a[href*="twitch.tv"], social-link-icon a[href*="guilded.gg"]'));
             
             let socialLinks = [];
             
-            // Extract links from Angular components
-            if (socialComponents.length > 0) {
-                for (const component of socialComponents) {
-                    try {
-                        const links = await component.findElements(By.css('a'));
-                        for (const link of links) {
-                            const href = await link.getAttribute('href');
-                            const ngHref = await link.getAttribute('ng-href');
-                            const title = await link.getAttribute('title');
-                            const ariaLabel = await link.getAttribute('aria-label');
-                            const actualHref = href || ngHref;
-                            
-                            // Only process and log if it's a social media link
-                            if (actualHref && !actualHref.includes('roblox.com') && !actualHref.includes('create.roblox.com')) {
-                                // Check if it's actually a social media link
-                                if (actualHref.includes('x.com') || actualHref.includes('twitter.com') || 
-                                    actualHref.includes('facebook.com') || actualHref.includes('instagram.com') ||
-                                    actualHref.includes('youtube.com') || actualHref.includes('twitch.tv') ||
-                                    actualHref.includes('guilded.gg') || title === 'Twitter' || title === 'X' ||
-                                    title === 'Facebook' || title === 'Instagram' || title === 'YouTube' ||
-                                    title === 'Twitch' || title === 'Guilded' ||
-                                    ariaLabel?.includes('Twitter') || ariaLabel?.includes('X') ||
-                                    ariaLabel?.includes('Facebook') || ariaLabel?.includes('Instagram') ||
-                                    ariaLabel?.includes('YouTube') || ariaLabel?.includes('Twitch') ||
-                                    ariaLabel?.includes('Guilded')) {
-                                    
-                                    socialLinks.push({link, href: actualHref, title, ariaLabel});
-                                }
-                            }
-                        }
-                    } catch (e) {
-                        continue;
+            // Process social links directly
+            for (const link of socialComponents) {
+                try {
+                    const href = await link.getAttribute('href');
+                    const ngHref = await link.getAttribute('ng-href');
+                    const title = await link.getAttribute('title');
+                    const ariaLabel = await link.getAttribute('aria-label');
+                    const actualHref = href || ngHref;
+                    
+                    // Only process if it's a social media link
+                    if (actualHref && !actualHref.includes('roblox.com') && !actualHref.includes('create.roblox.com')) {
+                        socialLinks.push({link, href: actualHref, title, ariaLabel});
                     }
+                } catch (e) {
+                    continue;
                 }
             }
             
