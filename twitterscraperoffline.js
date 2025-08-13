@@ -12,6 +12,7 @@ const ITEM_IDS = process.env.ITEM_IDS || '123456,789012'; // Default item IDs to
 
 let driver;
 let profileDriver; // Separate driver for profile checks
+let rolimonsDriver; // Separate driver for Rolimons profile checks
 let totalUsersProcessed = 0;
 let totalConnectionsFound = 0;
 
@@ -189,8 +190,12 @@ async function scrapeRolimonsItem(itemId) {
                         // Get Rolimons data
                         const rolimonsData = await scrapeRolimonsUserProfile(userUrl);
                         if (!rolimonsData) {
+                            console.log(`(Skipping "${username}" - Could not get Rolimons data)`);
                             continue;
                         }
+                        
+                        // Debug logging
+                        console.log(`(Rolimons data for "${username}": Value=${rolimonsData.value.toLocaleString()}, TradeAds=${rolimonsData.tradeAds})`);
                         
                         if (rolimonsData.value > MAX_VALUE) {
                             console.log(`(Skipping "${username}" - Value too high: ${rolimonsData.value.toLocaleString()})`);
@@ -304,25 +309,35 @@ async function scrapeRolimonsItem(itemId) {
 
 // --- ROLIMONS USER PROFILE SCRAPING ---
 async function scrapeRolimonsUserProfile(profileUrl) {
-    const tempDriver = await new Builder()
-        .forBrowser('chrome')
-        .setChromeOptions(
-            new chrome.Options()
-                .addArguments('--headless')
-                .addArguments('--disable-gpu')
-                .addArguments('--window-size=1920,1080')
-                .addArguments('--no-sandbox')
-                .addArguments('--disable-dev-shm-usage')
-        )
-        .build();
+    // Use the dedicated Rolimons driver
+    if (!rolimonsDriver) {
+        console.log('🔧 Initializing Rolimons WebDriver...');
+        rolimonsDriver = await new Builder()
+            .forBrowser('chrome')
+            .setChromeOptions(
+                new chrome.Options()
+                    .addArguments('--headless')
+                    .addArguments('--disable-gpu')
+                    .addArguments('--window-size=1920,1080')
+                    .addArguments('--no-sandbox')
+                    .addArguments('--disable-dev-shm-usage')
+            )
+            .build();
+    }
 
+    let timeout;
     try {
-        await tempDriver.get(profileUrl);
-        await tempDriver.sleep(2000);
+        // Set a timeout for the entire operation
+        timeout = setTimeout(() => {
+            console.log(`⏰ Rolimons timeout reached for ${profileUrl}, skipping...`);
+        }, 5000); // 5 second timeout
+
+        await rolimonsDriver.get(profileUrl);
+        await rolimonsDriver.sleep(1000); // Reduced from 2000
 
         const getText = async (selector) => {
             try {
-                const element = await tempDriver.findElement(By.css(selector));
+                const element = await rolimonsDriver.findElement(By.css(selector));
                 return await element.getText();
             } catch {
                 return '';
@@ -367,7 +382,7 @@ async function scrapeRolimonsUserProfile(profileUrl) {
         
         for (const selector of tradeAdsSelectors) {
             try {
-                const tradeAdsElement = await tempDriver.findElement(By.css(selector));
+                const tradeAdsElement = await rolimonsDriver.findElement(By.css(selector));
                 const tradeAdsText = await tradeAdsElement.getText();
                 const match = tradeAdsText.match(/(\d+)/);
                 if (match) {
@@ -379,7 +394,8 @@ async function scrapeRolimonsUserProfile(profileUrl) {
             }
         }
 
-        await tempDriver.quit();
+        // Clear the timeout since we completed successfully
+        clearTimeout(timeout);
 
         return {
             username: username.trim(),
@@ -389,7 +405,9 @@ async function scrapeRolimonsUserProfile(profileUrl) {
         };
 
     } catch (error) {
-        await tempDriver.quit();
+        // Clear the timeout in case of error
+        clearTimeout(timeout);
+        console.log(`❌ Error getting Rolimons data: ${error.message}`);
         return null;
     }
 }
@@ -616,6 +634,10 @@ async function main() {
     
     if (profileDriver) {
         await profileDriver.quit();
+    }
+    
+    if (rolimonsDriver) {
+        await rolimonsDriver.quit();
     }
 }
 
